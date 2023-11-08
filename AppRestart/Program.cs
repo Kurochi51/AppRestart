@@ -7,9 +7,8 @@ public class AppRestart
     private static readonly AppRestart MainApp = new();
     private CancellationTokenSource? cts;
     private Process? appToRestart;
-    private string appPath = string.Empty;
+    private string appPath = string.Empty, appName = string.Empty;
     private int restartInterval;
-    private bool shouldExit;
 
     private AppRestart()
     {
@@ -35,7 +34,7 @@ public class AppRestart
         cts = new();
         var token = cts.Token;
         var monitor = MonitorTask(token);
-        Console.WriteLine("Application: {0}", appToRestart.ProcessName);
+        Console.WriteLine("Application: {0}", appName);
         Console.WriteLine("1. Exit");
         while (true)
         {
@@ -49,8 +48,7 @@ public class AppRestart
                 var optionInput = Reader.ReadLine(3000);
                 if (!string.IsNullOrWhiteSpace(optionInput) && optionInput.Equals("1"))
                 {
-                    Console.WriteLine("Exiting program.");
-                    shouldExit = true;
+                    Console.WriteLine("Exiting program...");
                     break;
                 }
                 else
@@ -70,7 +68,7 @@ public class AppRestart
     private bool UserInput()
     {
         Console.WriteLine("Enter the name of the process you want to search for:");
-        var appName = Console.ReadLine()?.Trim() ?? string.Empty;
+        appName = Console.ReadLine()?.Trim() ?? string.Empty;
         appToRestart = FindProcess(appName);
         if (appToRestart?.MainModule is null)
         {
@@ -78,6 +76,7 @@ public class AppRestart
             return false;
         }
         appPath = appToRestart.MainModule.FileName;
+        appName = appToRestart.ProcessName;
         Console.WriteLine("Enter the restart interval in hours:");
         while (true)
         {
@@ -98,24 +97,38 @@ public class AppRestart
 
     private async Task MonitorTask(CancellationToken token)
     {
+        const int startDelay = 10;
+        var firstTime = true;
         while (!token.IsCancellationRequested)
         {
-            var sleepInMilliseconds = restartInterval * 1000 * 60 * 60;
-            await Task.Delay(sleepInMilliseconds, token);
+            if (firstTime)
+            {
+                await Task.Delay(TimeSpan.FromHours(restartInterval), token);
+                firstTime = false;
+            }
+            else
+            {
+                await Task.Delay(TimeSpan.FromHours(restartInterval) - TimeSpan.FromSeconds(startDelay), token);
+            }
             
-            if (shouldExit || appToRestart is null)
+            if (token.IsCancellationRequested)
             {
                 return;
             }
 
-            if (FindProcessId(appToRestart.ProcessName) is 0)
+            if (appToRestart is null || FindProcessId(appName) is 0)
             {
-                Console.WriteLine("Program {0} isn't running.", appToRestart.ProcessName);
+                Console.WriteLine("Program {0} isn't running.", appName);
                 return;
             }
+            var isDiscord = appName.Trim().ToLower().Equals("discord");
+            var path = isDiscord ? "\"" + Directory.GetParent(appPath)?.Parent?.FullName + Path.DirectorySeparatorChar + "Update.exe --processStart Discord.exe" + "\"" : "\"" + appPath + "\"";
+            var startArg = "/c " + path;
             appToRestart.Kill();
             await appToRestart.WaitForExitAsync(token);
-            appToRestart = Process.Start(appPath);
+            Process.Start("CMD.exe",startArg);
+            await Task.Delay(TimeSpan.FromSeconds(startDelay), token);
+            appToRestart = FindProcess(appName);
         }
     }
     
