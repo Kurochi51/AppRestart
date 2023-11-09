@@ -7,7 +7,7 @@ public class AppRestart
     private static readonly AppRestart MainApp = new();
     private CancellationTokenSource? cts;
     private Process? appToRestart;
-    private string appPath = string.Empty, appName = string.Empty;
+    private string appName = string.Empty;
     private int restartInterval;
 
     private AppRestart()
@@ -19,7 +19,7 @@ public class AppRestart
     {
         MainApp.RestartApp();
         Console.WriteLine("Press any key to exit...");
-        Console.ReadLine();
+        Reader.ReadLine();
         Environment.Exit(0);
     }
 
@@ -36,6 +36,8 @@ public class AppRestart
         var monitor = MonitorTask(token);
         Console.WriteLine("Application: {0}", appName);
         Console.WriteLine("1. Exit");
+        Console.WriteLine();
+        _ = Countdown(restartInterval, token);
         while (true)
         {
             if (monitor.IsCompleted)
@@ -51,11 +53,8 @@ public class AppRestart
                     Console.WriteLine("Exiting program...");
                     break;
                 }
-                else
-                {
-                    Console.WriteLine("Invalid option {0}. Please select a valid option.", optionInput);
-                    Console.WriteLine("1. Exit");
-                }
+                Console.WriteLine("Invalid option {0}. Please select a valid option.", optionInput);
+                Console.WriteLine("1. Exit");
             }
             catch
             {
@@ -63,6 +62,7 @@ public class AppRestart
             }
         }
         cts.Cancel();
+        Console.OpenStandardInput();
     }
     
     private bool UserInput()
@@ -70,13 +70,12 @@ public class AppRestart
         Console.WriteLine("Enter the name of the process you want to search for:");
         appName = Console.ReadLine()?.Trim() ?? string.Empty;
         appToRestart = FindProcess(appName);
-        if (appToRestart?.MainModule is null)
+        if (appToRestart?.MainModule?.FileVersionInfo.ProductName is null)
         {
             Console.WriteLine("Process not found.");
             return false;
         }
-        appPath = appToRestart.MainModule.FileName;
-        appName = appToRestart.ProcessName;
+        appName = appToRestart.MainModule.FileVersionInfo.ProductName;
         Console.WriteLine("Enter the restart interval in hours:");
         while (true)
         {
@@ -97,52 +96,79 @@ public class AppRestart
 
     private async Task MonitorTask(CancellationToken token)
     {
-        const int startDelay = 10;
-        var firstTime = true;
         while (!token.IsCancellationRequested)
         {
-            if (firstTime)
-            {
-                await Task.Delay(TimeSpan.FromHours(restartInterval), token);
-                firstTime = false;
-            }
-            else
-            {
-                await Task.Delay(TimeSpan.FromHours(restartInterval) - TimeSpan.FromSeconds(startDelay), token);
-            }
+            await Task.Delay(TimeSpan.FromSeconds(restartInterval), token);
             
             if (token.IsCancellationRequested)
             {
                 return;
             }
 
-            if (appToRestart is null || FindProcessId(appName) is 0)
+            if (appToRestart?.MainModule is null || FindProcessId(appToRestart.ProcessName.Trim()) is 0)
             {
                 Console.WriteLine("Program {0} isn't running.", appName);
                 return;
             }
-            var isDiscord = appName.Trim().ToLower().Equals("discord");
-            var path = isDiscord ? "\"" + Directory.GetParent(appPath)?.Parent?.FullName + Path.DirectorySeparatorChar + "Update.exe --processStart Discord.exe" + "\"" : "\"" + appPath + "\"";
-            var startArg = "/c " + path;
+
+            var newApp = new Process
+            {
+                StartInfo = new(appToRestart.MainModule.FileName)
+                {
+                    RedirectStandardError = true,
+                    RedirectStandardInput = true,
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                },
+            };
             appToRestart.Kill();
             await appToRestart.WaitForExitAsync(token);
-            Process.Start("CMD.exe",startArg);
-            await Task.Delay(TimeSpan.FromSeconds(startDelay), token);
-            appToRestart = FindProcess(appName);
+            appToRestart = newApp;
+            appToRestart.Start();
+            appToRestart.StandardInput.Close();
+            appToRestart.StandardOutput.Close();
+            appToRestart.StandardError.Close();
         }
     }
     
     private static Process? FindProcess(string processName)
     {
         var processList = Process.GetProcesses();
-        return processList.FirstOrDefault(process => process.ProcessName.Trim().ToLower().Equals(processName.ToLower()));
+        return (from process in processList 
+                where process.ProcessName.Trim().ToLower().Equals(processName.ToLower()) 
+                select process).FirstOrDefault();
     }
 
     private static int FindProcessId(string processName)
     {
         var processList = Process.GetProcesses();
-        return (from process in processList where process.ProcessName.Equals(processName) select process.Id)
-            .FirstOrDefault();
+        return (from process in processList 
+                where process.ProcessName.Trim().Equals(processName) 
+                select process.Id).FirstOrDefault();
+    }
+
+    private static async Task Countdown(int timer, CancellationToken ct)
+    {
+        var timeToWait = TimeSpan.FromSeconds(timer);
+        var originPos = Console.GetCursorPosition();
+        while (!ct.IsCancellationRequested)
+        {
+            var currentPos = Console.GetCursorPosition();
+            if (currentPos != originPos)
+            {
+                Console.SetCursorPosition(originPos.Left,originPos.Top);
+                Console.Write("\rTime until restart: {0}\n", timeToWait);
+                Console.SetCursorPosition(currentPos.Left, currentPos.Top);
+            }
+            else
+            {
+                Console.SetCursorPosition(originPos.Left,originPos.Top);
+                Console.Write("\rTime until restart: {0}\n", timeToWait);
+            }
+            timeToWait = timeToWait.Subtract(TimeSpan.FromSeconds(1));
+            await Task.Delay(TimeSpan.FromSeconds(1), ct);
+            timeToWait = timeToWait.TotalSeconds <= 0 ? TimeSpan.FromSeconds(timer) : timeToWait;
+        }
     }
 }
 
