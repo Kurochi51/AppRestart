@@ -98,7 +98,7 @@ public class AppRestart
     {
         while (!token.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(restartInterval), token);
+            await Task.Delay(TimeSpan.FromHours(restartInterval), token);
             
             if (token.IsCancellationRequested)
             {
@@ -149,7 +149,7 @@ public class AppRestart
 
     private static async Task Countdown(int timer, CancellationToken ct)
     {
-        var timeToWait = TimeSpan.FromSeconds(timer);
+        var timeToWait = TimeSpan.FromHours(timer);
         var originPos = Console.GetCursorPosition();
         while (!ct.IsCancellationRequested)
         {
@@ -167,7 +167,7 @@ public class AppRestart
             }
             timeToWait = timeToWait.Subtract(TimeSpan.FromSeconds(1));
             await Task.Delay(TimeSpan.FromSeconds(1), ct);
-            timeToWait = timeToWait.TotalSeconds <= 0 ? TimeSpan.FromSeconds(timer) : timeToWait;
+            timeToWait = timeToWait.TotalSeconds <= 0 ? TimeSpan.FromHours(timer) : timeToWait;
         }
     }
 }
