@@ -5,14 +5,14 @@ namespace AppRestart;
 public class AppRestart
 {
     private static readonly AppRestart MainApp = new();
-    private CancellationTokenSource? cts;
+    private static readonly TimeSpan OneSecond = TimeSpan.FromSeconds(1);
     private Process? appToRestart;
     private string appName = string.Empty;
     private int restartInterval;
 
     private AppRestart()
     {
-        
+        appToRestart = null;
     }
 
     private static void Main()
@@ -23,7 +23,6 @@ public class AppRestart
         Environment.Exit(0);
     }
 
-
     private void RestartApp()
     {
         if (!UserInput() || appToRestart is null)
@@ -31,7 +30,7 @@ public class AppRestart
             return;
         }
 
-        cts = new();
+        var cts = new CancellationTokenSource();
         var token = cts.Token;
         var monitor = MonitorTask(token);
         Console.WriteLine("Application: {0}", appName);
@@ -62,9 +61,8 @@ public class AppRestart
             }
         }
         cts.Cancel();
-        Console.OpenStandardInput();
     }
-    
+
     private bool UserInput()
     {
         Console.WriteLine("Enter the name of the process you want to search for:");
@@ -89,7 +87,7 @@ public class AppRestart
                 break;
             }
         }
-        
+
         return true;
     }
 
@@ -99,7 +97,7 @@ public class AppRestart
         while (!token.IsCancellationRequested)
         {
             await Task.Delay(TimeSpan.FromHours(restartInterval), token);
-            
+
             if (token.IsCancellationRequested)
             {
                 return;
@@ -130,20 +128,20 @@ public class AppRestart
             appToRestart.StandardError.Close();
         }
     }
-    
+
     private static Process? FindProcess(string processName)
     {
         var processList = Process.GetProcesses();
-        return (from process in processList 
-                where process.ProcessName.Trim().ToLower().Equals(processName.ToLower()) 
+        return (from process in processList
+                where process.ProcessName.Trim().ToLower().Equals(processName.ToLower())
                 select process).FirstOrDefault();
     }
 
     private static int FindProcessId(string processName)
     {
         var processList = Process.GetProcesses();
-        return (from process in processList 
-                where process.ProcessName.Trim().Equals(processName) 
+        return (from process in processList
+                where process.ProcessName.Trim().Equals(processName)
                 select process.Id).FirstOrDefault();
     }
 
@@ -156,17 +154,17 @@ public class AppRestart
             var currentPos = Console.GetCursorPosition();
             if (currentPos != originPos)
             {
-                Console.SetCursorPosition(originPos.Left,originPos.Top);
+                Console.SetCursorPosition(originPos.Left, originPos.Top);
                 Console.Write("\rTime until restart: {0}\n", timeToWait);
                 Console.SetCursorPosition(currentPos.Left, currentPos.Top);
             }
             else
             {
-                Console.SetCursorPosition(originPos.Left,originPos.Top);
+                Console.SetCursorPosition(originPos.Left, originPos.Top);
                 Console.Write("\rTime until restart: {0}\n", timeToWait);
             }
-            timeToWait = timeToWait.Subtract(TimeSpan.FromSeconds(1));
-            await Task.Delay(TimeSpan.FromSeconds(1), ct);
+            timeToWait = timeToWait.Subtract(OneSecond);
+            await Task.Delay(OneSecond, ct);
             timeToWait = timeToWait.TotalSeconds <= 0 ? TimeSpan.FromHours(timer) : timeToWait;
         }
     }

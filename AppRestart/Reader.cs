@@ -1,12 +1,13 @@
 namespace AppRestart;
 
-public class Reader {
-    private static readonly AutoResetEvent GetInput, GotInput;
+public static class Reader
+{
+    private static readonly AutoResetEvent GetInput = new(false);
+    private static readonly AutoResetEvent GotInput = new(false);
     private static string? Input;
 
-    static Reader() {
-        GetInput = new(false);
-        GotInput = new(false);
+    static Reader()
+    {
         var inputThread = new Thread(ReaderThread)
         {
             IsBackground = true,
@@ -16,7 +17,7 @@ public class Reader {
 
     private static void ReaderThread()
     {
-        while (true) 
+        while (true)
         {
             GetInput.WaitOne();
             Input = Console.ReadLine() ?? string.Empty;
@@ -25,7 +26,8 @@ public class Reader {
     }
 
     // omit the parameter to read a line without a timeout
-    public static string ReadLine(int timeOutMilliseconds = Timeout.Infinite) {
+    public static string ReadLine(int timeOutMilliseconds = Timeout.Infinite)
+    {
         GetInput.Set();
         var success = GotInput.WaitOne(timeOutMilliseconds);
         if (success)
