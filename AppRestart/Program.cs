@@ -46,13 +46,21 @@ public class AppRestart
             }
             try
             {
-                var optionInput = Reader.ReadLine(3000);
-                if (!string.IsNullOrWhiteSpace(optionInput) && optionInput.Equals("1"))
+                var optionInput = Reader.ReadLine(30000);
+                if (!string.IsNullOrWhiteSpace(optionInput))
                 {
-                    Console.WriteLine("Exiting program...");
-                    break;
+                    if (optionInput.Equals("1"))
+                    {
+                        Console.WriteLine("Exiting program...");
+                        break;
+                    }
+                    Console.WriteLine("Invalid option {0}. Please select a valid option.", optionInput);
                 }
-                Console.WriteLine("Invalid option {0}. Please select a valid option.", optionInput);
+                else
+                {
+                    Console.WriteLine("No option selected. Please select a valid option.");
+
+                }
                 Console.WriteLine("1. Exit");
             }
             catch
@@ -148,6 +156,8 @@ public class AppRestart
     private static async Task Countdown(int timer, CancellationToken ct)
     {
         var timeToWait = TimeSpan.FromHours(timer);
+        var timeFormat = timeToWait.TotalDays > 9 ? @"dd\:hh\:mm\:ss" :
+                         timeToWait.TotalDays < 1 || timeToWait.TotalHours == 24 ? @"hh\:mm\:ss" : @"d\:hh\:mm\:ss";
         var originPos = Console.GetCursorPosition();
         while (!ct.IsCancellationRequested)
         {
@@ -155,13 +165,13 @@ public class AppRestart
             if (currentPos != originPos)
             {
                 Console.SetCursorPosition(originPos.Left, originPos.Top);
-                Console.Write("\rTime until restart: {0}\n", timeToWait);
+                Console.Write("\rTime until restart: {0}\n", timeToWait.ToString(timeFormat));
                 Console.SetCursorPosition(currentPos.Left, currentPos.Top);
             }
             else
             {
                 Console.SetCursorPosition(originPos.Left, originPos.Top);
-                Console.Write("\rTime until restart: {0}\n", timeToWait);
+                Console.Write("\rTime until restart: {0}\n", timeToWait.ToString(timeFormat));
             }
             timeToWait = timeToWait.Subtract(OneSecond);
             await Task.Delay(OneSecond, ct);

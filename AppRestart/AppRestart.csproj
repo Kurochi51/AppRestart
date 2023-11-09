@@ -6,6 +6,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <LangVersion>default</LangVersion>
+        <ApplicationIcon>Icon\2084.ico</ApplicationIcon>
     </PropertyGroup>
 
 </Project>
