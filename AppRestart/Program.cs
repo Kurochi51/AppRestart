@@ -32,11 +32,15 @@ public class AppRestart
 
         var cts = new CancellationTokenSource();
         var token = cts.Token;
-        var monitor = MonitorTask(token);
+        var restartTimeSpan = TimeSpan.FromHours(restartInterval);
+        var restartTime = DateTime.Now.AddHours(restartTimeSpan.TotalHours);
+        var restartString = restartTime.Hour.ToString("D2") + ":" + restartTime.Minute.ToString("D2");
+        var monitor = MonitorTask(restartTimeSpan, token);
         Console.WriteLine("Application: {0}", appName);
+        Console.WriteLine("Restart occurs at: {0}", restartString);
         Console.WriteLine("1. Exit");
         Console.WriteLine();
-        _ = Countdown(restartInterval, token);
+        _ = Countdown(restartTimeSpan, token);
         while (true)
         {
             if (monitor.IsCompleted)
@@ -100,11 +104,11 @@ public class AppRestart
     }
 
 
-    private async Task MonitorTask(CancellationToken token)
+    private async Task MonitorTask(TimeSpan restartTimeSpan, CancellationToken token)
     {
         while (!token.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromHours(restartInterval), token);
+            await Task.Delay(restartTimeSpan, token);
 
             if (token.IsCancellationRequested)
             {
@@ -132,8 +136,6 @@ public class AppRestart
             appToRestart = newApp;
             appToRestart.Start();
             appToRestart.StandardInput.Close();
-            appToRestart.StandardOutput.Close();
-            appToRestart.StandardError.Close();
         }
     }
 
@@ -153,14 +155,16 @@ public class AppRestart
                 select process.Id).FirstOrDefault();
     }
 
-    private static async Task Countdown(int timer, CancellationToken ct)
+    private static async Task Countdown(TimeSpan restartTimeSpan, CancellationToken ct)
     {
-        var timeToWait = TimeSpan.FromHours(timer);
+        var timeToWait = restartTimeSpan;
         var timeFormat = timeToWait.TotalDays > 9 ? @"dd\:hh\:mm\:ss" :
-                         timeToWait.TotalDays < 1 || timeToWait.TotalHours == 24 ? @"hh\:mm\:ss" : @"d\:hh\:mm\:ss";
+                         timeToWait.TotalDays < 1 || timeToWait.TotalHours.Equals(24) ? @"hh\:mm\:ss" : @"d\:hh\:mm\:ss";
         var originPos = Console.GetCursorPosition();
+        var stopWatch = new Stopwatch();
         while (!ct.IsCancellationRequested)
         {
+            stopWatch.Restart();
             var currentPos = Console.GetCursorPosition();
             if (currentPos != originPos)
             {
@@ -174,8 +178,13 @@ public class AppRestart
                 Console.Write("\rTime until restart: {0}\n", timeToWait.ToString(timeFormat));
             }
             timeToWait = timeToWait.Subtract(OneSecond);
-            await Task.Delay(OneSecond, ct);
-            timeToWait = timeToWait.TotalSeconds <= 0 ? TimeSpan.FromHours(timer) : timeToWait;
+            if (timeToWait.TotalSeconds <= 0)
+            {
+                timeToWait = restartTimeSpan;
+            }
+            stopWatch.Stop();
+            var waitTime = OneSecond - stopWatch.Elapsed;
+            await Task.Delay(waitTime, ct);
         }
     }
 }
