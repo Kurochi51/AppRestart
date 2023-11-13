@@ -18,6 +18,7 @@ public class AppRestart
     private static void Main()
     {
         MainApp.RestartApp();
+        //Console.WriteLine("Stopped at: {0}", DateTime.Now);
         Console.WriteLine("Press any key to exit...");
         Reader.ReadLine();
         Environment.Exit(0);
@@ -29,18 +30,19 @@ public class AppRestart
         {
             return;
         }
-
+        var stopWatch = new Stopwatch();
+        stopWatch.Start();
         var cts = new CancellationTokenSource();
         var token = cts.Token;
-        var restartTimeSpan = TimeSpan.FromHours(restartInterval);
-        var restartTime = DateTime.Now.AddHours(restartTimeSpan.TotalHours);
-        var restartString = restartTime.Hour.ToString("D2") + ":" + restartTime.Minute.ToString("D2");
+        var restartTime = DateTime.Now.AddHours(restartInterval);
+        var restartTimeSpan = restartTime - DateTime.Now;
+        var restartString = restartTime.Hour.ToString("D2") + ":" + restartTime.Minute.ToString("D2");// + ":" + restartTime.Second.ToString("D2");
         var monitor = MonitorTask(restartTimeSpan, token);
         Console.WriteLine("Application: {0}", appName);
         Console.WriteLine("Restart occurs at: {0}", restartString);
         Console.WriteLine("1. Exit");
         Console.WriteLine();
-        _ = Countdown(restartTimeSpan, token);
+        _ = Countdown(restartTimeSpan, stopWatch, token);
         while (true)
         {
             if (monitor.IsCompleted)
@@ -125,8 +127,6 @@ public class AppRestart
             {
                 StartInfo = new(appToRestart.MainModule.FileName)
                 {
-                    RedirectStandardError = true,
-                    RedirectStandardInput = true,
                     RedirectStandardOutput = true,
                     UseShellExecute = false,
                 },
@@ -135,7 +135,6 @@ public class AppRestart
             await appToRestart.WaitForExitAsync(token);
             appToRestart = newApp;
             appToRestart.Start();
-            appToRestart.StandardInput.Close();
         }
     }
 
@@ -155,16 +154,14 @@ public class AppRestart
                 select process.Id).FirstOrDefault();
     }
 
-    private static async Task Countdown(TimeSpan restartTimeSpan, CancellationToken ct)
+    private static async Task Countdown(TimeSpan restartTimeSpan, Stopwatch stopWatch, CancellationToken ct)
     {
         var timeToWait = restartTimeSpan;
         var timeFormat = timeToWait.TotalDays > 9 ? @"dd\:hh\:mm\:ss" :
-                         timeToWait.TotalDays < 1 || timeToWait.TotalHours.Equals(24) ? @"hh\:mm\:ss" : @"d\:hh\:mm\:ss";
+                         timeToWait.TotalDays < 1 || (int)timeToWait.TotalHours == 24 ? @"hh\:mm\:ss" : @"d\:hh\:mm\:ss";
         var originPos = Console.GetCursorPosition();
-        var stopWatch = new Stopwatch();
         while (!ct.IsCancellationRequested)
         {
-            stopWatch.Restart();
             var currentPos = Console.GetCursorPosition();
             if (currentPos != originPos)
             {
@@ -185,6 +182,7 @@ public class AppRestart
             stopWatch.Stop();
             var waitTime = OneSecond - stopWatch.Elapsed;
             await Task.Delay(waitTime, ct);
+            stopWatch.Restart();
         }
     }
 }
