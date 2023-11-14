@@ -33,7 +33,7 @@ public class AppRestart
         {
             return;
         }
-        
+
         //var stopWatch = new Stopwatch();
         //stopWatch.Start();
         var cts = new CancellationTokenSource();
@@ -130,10 +130,13 @@ public class AppRestart
                 return;
             }
 
+            var workingDir = Path.GetDirectoryName(appToRestart.MainModule.FileName)
+                             ?? Path.GetPathRoot(appToRestart.MainModule.FileName)!;
             var newApp = new Process
             {
                 StartInfo = new(appToRestart.MainModule.FileName)
                 {
+                    WorkingDirectory = workingDir,
                     RedirectStandardOutput = true,
                     UseShellExecute = false,
                 },
@@ -203,7 +206,7 @@ public class AppRestart
             => HandleTimer(sender, e, ref timeToWait, restartTimeSpan, originPos, ct);
         Timer.Start();
     }
-    
+
     private static void HandleTimer(
         object? sender,
         ElapsedEventArgs e,
@@ -227,7 +230,7 @@ public class AppRestart
             {
                 Console.SetCursorPosition(originPos.Left, originPos.Top);
                 Console.Write("\rTime until restart: {0}", timeToWait.ToString(timeFormat));
-                Console.SetCursorPosition(currentPos.Left, currentPos.Top+1);
+                Console.SetCursorPosition(currentPos.Left, currentPos.Top + 1);
             }
             timeToWait = timeToWait.Subtract(OneSecond);
             if (timeToWait.TotalSeconds <= 0)
