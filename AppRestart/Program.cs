@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Timers;
+using Timer = System.Timers.Timer;
 
 namespace AppRestart;
 
@@ -9,6 +11,7 @@ public class AppRestart
     private Process? appToRestart;
     private string appName = string.Empty;
     private int restartInterval;
+    private static readonly Timer Timer = new();
 
     private AppRestart()
     {
@@ -18,7 +21,7 @@ public class AppRestart
     private static void Main()
     {
         MainApp.RestartApp();
-        //Console.WriteLine("Stopped at: {0}", DateTime.Now);
+        Timer.Dispose();
         Console.WriteLine("Press any key to exit...");
         Reader.ReadLine();
         Environment.Exit(0);
@@ -30,19 +33,22 @@ public class AppRestart
         {
             return;
         }
-        var stopWatch = new Stopwatch();
-        stopWatch.Start();
+        
+        //var stopWatch = new Stopwatch();
+        //stopWatch.Start();
         var cts = new CancellationTokenSource();
         var token = cts.Token;
         var restartTime = DateTime.Now.AddHours(restartInterval);
         var restartTimeSpan = restartTime - DateTime.Now;
-        var restartString = restartTime.Hour.ToString("D2") + ":" + restartTime.Minute.ToString("D2");// + ":" + restartTime.Second.ToString("D2");
+        var restartString = restartTime.Hour.ToString("D2") + ":" + restartTime.Minute.ToString("D2") + ":" + restartTime.Second.ToString("D2");
         var monitor = MonitorTask(restartTimeSpan, token);
         Console.WriteLine("Application: {0}", appName);
         Console.WriteLine("Restart occurs at: {0}", restartString);
         Console.WriteLine("1. Exit");
         Console.WriteLine();
-        _ = Countdown(restartTimeSpan, stopWatch, token);
+        _ = Task.Run(() => SetupTimer(restartTimeSpan, token), token);
+        //SetupTimer(restartTimeSpan, token);
+        //_ = Countdown(restartTimeSpan, stopWatch, token);
         while (true)
         {
             if (monitor.IsCompleted)
@@ -57,6 +63,7 @@ public class AppRestart
                 {
                     if (optionInput.Equals("1"))
                     {
+                        Timer.Stop();
                         Console.WriteLine("Exiting program...");
                         break;
                     }
@@ -181,8 +188,52 @@ public class AppRestart
             }
             stopWatch.Stop();
             var waitTime = OneSecond - stopWatch.Elapsed;
-            await Task.Delay(waitTime, ct);
+            await Task.Delay(waitTime, ct).ConfigureAwait(false);
             stopWatch.Restart();
+        }
+    }
+
+    private static void SetupTimer(TimeSpan restartTimeSpan, CancellationToken ct)
+    {
+        var timeToWait = restartTimeSpan;
+        var originPos = Console.GetCursorPosition();
+        Timer.Interval = OneSecond.TotalMilliseconds;
+        Timer.AutoReset = true;
+        Timer.Elapsed += (sender, e)
+            => HandleTimer(sender, e, ref timeToWait, restartTimeSpan, originPos, ct);
+        Timer.Start();
+    }
+    
+    private static void HandleTimer(
+        object? sender,
+        ElapsedEventArgs e,
+        ref TimeSpan timeToWait,
+        TimeSpan restartTimeSpan,
+        (int Left, int Top) originPos,
+        CancellationToken ct)
+    {
+        var timeFormat = timeToWait.TotalDays > 9 ? @"dd\:hh\:mm\:ss" :
+                         timeToWait.TotalDays < 1 || (int)timeToWait.TotalHours == 24 ? @"hh\:mm\:ss" : @"d\:hh\:mm\:ss";
+        if (!ct.IsCancellationRequested)
+        {
+            var currentPos = Console.GetCursorPosition();
+            if (currentPos != originPos)
+            {
+                Console.SetCursorPosition(originPos.Left, originPos.Top);
+                Console.Write("\rTime until restart: {0}", timeToWait.ToString(timeFormat));
+                Console.SetCursorPosition(currentPos.Left, currentPos.Top);
+            }
+            else
+            {
+                Console.SetCursorPosition(originPos.Left, originPos.Top);
+                Console.Write("\rTime until restart: {0}", timeToWait.ToString(timeFormat));
+                Console.SetCursorPosition(currentPos.Left, currentPos.Top+1);
+            }
+            timeToWait = timeToWait.Subtract(OneSecond);
+            if (timeToWait.TotalSeconds <= 0)
+            {
+                timeToWait = restartTimeSpan;
+            }
         }
     }
 }
