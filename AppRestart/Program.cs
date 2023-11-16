@@ -133,17 +133,16 @@ public class AppRestart
             {
                 var lastSeparator = workingDir.LastIndexOf(Path.DirectorySeparatorChar);
                 workingDir = lastSeparator != -1 ? workingDir[..lastSeparator] : workingDir;
-                var updaterPath = workingDir + Path.DirectorySeparatorChar + "Update.exe";
-                var discord = new Process
+                var discordUpdaterPath = workingDir + Path.DirectorySeparatorChar + "Update.exe";
+                newApp = new()
                 {
-                    StartInfo = new(updaterPath)
+                    StartInfo = new(discordUpdaterPath)
                     {
                         WorkingDirectory = workingDir,
                         Arguments = "--processStart Discord.exe",
                         UseShellExecute = false,
                     },
                 };
-                newApp = discord;
             }
             else
             {
