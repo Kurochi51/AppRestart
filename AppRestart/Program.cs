@@ -129,13 +129,14 @@ public class AppRestart
             var workingDir = Path.GetDirectoryName(appToRestart.MainModule.FileName)
                              ?? Path.GetPathRoot(appToRestart.MainModule.FileName)!;
             Process newApp;
-            if (appToRestart.ProcessName.Contains("discord",StringComparison.OrdinalIgnoreCase))
+            if (appToRestart.MainModule.FileVersionInfo.ProductName.Contains("discord",StringComparison.OrdinalIgnoreCase))
             {
                 var lastSeparator = workingDir.LastIndexOf(Path.DirectorySeparatorChar);
                 workingDir = lastSeparator != -1 ? workingDir[..lastSeparator] : workingDir;
+                var updaterPath = workingDir + Path.DirectorySeparatorChar + "Update.exe";
                 var discord = new Process
                 {
-                    StartInfo = new(workingDir + Path.DirectorySeparatorChar + "Update.exe")
+                    StartInfo = new(updaterPath)
                     {
                         WorkingDirectory = workingDir,
                         Arguments = "--processStart Discord.exe",
