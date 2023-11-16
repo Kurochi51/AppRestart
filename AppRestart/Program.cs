@@ -33,9 +33,7 @@ public class AppRestart
         {
             return;
         }
-
-        //var stopWatch = new Stopwatch();
-        //stopWatch.Start();
+        
         var cts = new CancellationTokenSource();
         var token = cts.Token;
         var restartTime = DateTime.Now.AddHours(restartInterval);
@@ -47,8 +45,6 @@ public class AppRestart
         Console.WriteLine("1. Exit");
         Console.WriteLine();
         _ = Task.Run(() => SetupTimer(restartTimeSpan, token), token);
-        //SetupTimer(restartTimeSpan, token);
-        //_ = Countdown(restartTimeSpan, stopWatch, token);
         while (true)
         {
             if (monitor.IsCompleted)
@@ -124,7 +120,7 @@ public class AppRestart
                 return;
             }
 
-            if (appToRestart?.MainModule is null || FindProcessId(appToRestart.ProcessName.Trim()) is 0)
+            if (appToRestart?.MainModule?.FileVersionInfo.ProductName is null || FindProcessId(appToRestart.ProcessName.Trim()) is 0)
             {
                 Console.WriteLine("Program {0} isn't running.", appName);
                 return;
@@ -132,15 +128,34 @@ public class AppRestart
 
             var workingDir = Path.GetDirectoryName(appToRestart.MainModule.FileName)
                              ?? Path.GetPathRoot(appToRestart.MainModule.FileName)!;
-            var newApp = new Process
+            Process newApp;
+            if (appToRestart.ProcessName.Contains("discord",StringComparison.OrdinalIgnoreCase))
             {
-                StartInfo = new(appToRestart.MainModule.FileName)
+                var lastSeparator = workingDir.LastIndexOf(Path.DirectorySeparatorChar);
+                workingDir = lastSeparator != -1 ? workingDir[..lastSeparator] : workingDir;
+                var discord = new Process
                 {
-                    WorkingDirectory = workingDir,
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                },
-            };
+                    StartInfo = new(workingDir + Path.DirectorySeparatorChar + "Update.exe")
+                    {
+                        WorkingDirectory = workingDir,
+                        Arguments = "--processStart Discord.exe",
+                        UseShellExecute = false,
+                    },
+                };
+                newApp = discord;
+            }
+            else
+            {
+                newApp = new()
+                {
+                    StartInfo = new(appToRestart.MainModule.FileName)
+                    {
+                        WorkingDirectory = workingDir,
+                        RedirectStandardOutput = true,
+                        UseShellExecute = false,
+                    },
+                };
+            }
             appToRestart.Kill();
             await appToRestart.WaitForExitAsync(token);
             appToRestart = newApp;
@@ -162,38 +177,6 @@ public class AppRestart
         return (from process in processList
                 where process.ProcessName.Trim().Equals(processName)
                 select process.Id).FirstOrDefault();
-    }
-
-    private static async Task Countdown(TimeSpan restartTimeSpan, Stopwatch stopWatch, CancellationToken ct)
-    {
-        var timeToWait = restartTimeSpan;
-        var timeFormat = timeToWait.TotalDays > 9 ? @"dd\:hh\:mm\:ss" :
-                         timeToWait.TotalDays < 1 || (int)timeToWait.TotalHours == 24 ? @"hh\:mm\:ss" : @"d\:hh\:mm\:ss";
-        var originPos = Console.GetCursorPosition();
-        while (!ct.IsCancellationRequested)
-        {
-            var currentPos = Console.GetCursorPosition();
-            if (currentPos != originPos)
-            {
-                Console.SetCursorPosition(originPos.Left, originPos.Top);
-                Console.Write("\rTime until restart: {0}\n", timeToWait.ToString(timeFormat));
-                Console.SetCursorPosition(currentPos.Left, currentPos.Top);
-            }
-            else
-            {
-                Console.SetCursorPosition(originPos.Left, originPos.Top);
-                Console.Write("\rTime until restart: {0}\n", timeToWait.ToString(timeFormat));
-            }
-            timeToWait = timeToWait.Subtract(OneSecond);
-            if (timeToWait.TotalSeconds <= 0)
-            {
-                timeToWait = restartTimeSpan;
-            }
-            stopWatch.Stop();
-            var waitTime = OneSecond - stopWatch.Elapsed;
-            await Task.Delay(waitTime, ct).ConfigureAwait(false);
-            stopWatch.Restart();
-        }
     }
 
     private static void SetupTimer(TimeSpan restartTimeSpan, CancellationToken ct)
