@@ -9,4 +9,11 @@
         <ApplicationIcon>Icon\2084.ico</ApplicationIcon>
     </PropertyGroup>
 
+    <ItemGroup>
+      <PackageReference Include="Meziantou.Analyzer" Version="2.0.112">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
+    </ItemGroup>
+
 </Project>

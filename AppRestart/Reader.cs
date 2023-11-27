@@ -1,9 +1,9 @@
-namespace AppRestart;
+namespace ConsoleAppRestart;
 
 public static class Reader
 {
-    private static readonly AutoResetEvent GetInput = new(false);
-    private static readonly AutoResetEvent GotInput = new(false);
+    private static readonly AutoResetEvent GetInput = new(initialState: false);
+    private static readonly AutoResetEvent GotInput = new(initialState: false);
     private static string? Input;
 
     static Reader()

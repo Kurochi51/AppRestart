@@ -1,8 +1,9 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Timers;
 using Timer = System.Timers.Timer;
 
-namespace AppRestart;
+namespace ConsoleAppRestart;
 
 public class AppRestart
 {
@@ -27,6 +28,7 @@ public class AppRestart
         Environment.Exit(0);
     }
 
+#pragma warning disable MA0011 // IFormatProvider is missing
     private void RestartApp()
     {
         if (!UserInput() || appToRestart is null)
@@ -36,7 +38,7 @@ public class AppRestart
         
         var cts = new CancellationTokenSource();
         var token = cts.Token;
-        var restartTime = DateTime.Now.AddHours(restartInterval);
+        var restartTime = DateTime.Now.AddSeconds(restartInterval);
         var restartTimeSpan = restartTime - DateTime.Now;
         var restartString = restartTime.Hour.ToString("D2") + ":" + restartTime.Minute.ToString("D2") + ":" + restartTime.Second.ToString("D2");
         var monitor = MonitorTask(restartTimeSpan, token);
@@ -49,6 +51,12 @@ public class AppRestart
         {
             if (monitor.IsCompleted)
             {
+                if (monitor.IsFaulted)
+                {
+                    var message = monitor.Exception?.Message;
+                    Console.WriteLine("Monitor task faulted with message: {0}", message ?? "Unknown");
+                    break;
+                }
                 Console.WriteLine("Exiting program. Monitor task is stopped.");
                 break;
             }
@@ -57,7 +65,7 @@ public class AppRestart
                 var optionInput = Reader.ReadLine(30000);
                 if (!string.IsNullOrWhiteSpace(optionInput))
                 {
-                    if (optionInput.Equals("1"))
+                    if (optionInput.Equals("1", StringComparison.Ordinal))
                     {
                         Timer.Stop();
                         Console.WriteLine("Exiting program...");
@@ -79,6 +87,7 @@ public class AppRestart
         }
         cts.Cancel();
     }
+#pragma warning restore MA0011 // IFormatProvider is missing
 
     private bool UserInput()
     {
@@ -99,7 +108,7 @@ public class AppRestart
             {
                 Console.WriteLine("Invalid input. Please enter a valid number.");
             }
-            else if (int.TryParse(input, out restartInterval))
+            else if (int.TryParse(input, CultureInfo.InvariantCulture, out restartInterval))
             {
                 break;
             }
@@ -113,13 +122,14 @@ public class AppRestart
     {
         while (!token.IsCancellationRequested)
         {
-            await Task.Delay(restartTimeSpan, token);
+            await Task.Delay(restartTimeSpan, token).ConfigureAwait(false);
 
             if (token.IsCancellationRequested)
             {
                 return;
             }
 
+            appToRestart = FindProcess(appName);
             if (appToRestart?.MainModule?.FileVersionInfo.ProductName is null || FindProcessId(appToRestart.ProcessName.Trim()) is 0)
             {
                 Console.WriteLine("Program {0} isn't running.", appName);
@@ -157,9 +167,8 @@ public class AppRestart
                 };
             }
             appToRestart.Kill();
-            await appToRestart.WaitForExitAsync(token);
-            appToRestart = newApp;
-            appToRestart.Start();
+            await appToRestart.WaitForExitAsync(token).ConfigureAwait(false);
+            newApp.Start();
         }
     }
 
@@ -167,7 +176,7 @@ public class AppRestart
     {
         var processList = Process.GetProcesses();
         return (from process in processList
-                where process.ProcessName.Trim().ToLower().Equals(processName.ToLower())
+                where process.ProcessName.Trim().Equals(processName, StringComparison.OrdinalIgnoreCase)
                 select process).FirstOrDefault();
     }
 
@@ -175,7 +184,7 @@ public class AppRestart
     {
         var processList = Process.GetProcesses();
         return (from process in processList
-                where process.ProcessName.Trim().Equals(processName)
+                where process.ProcessName.Trim().Equals(processName, StringComparison.OrdinalIgnoreCase)
                 select process.Id).FirstOrDefault();
     }
 
@@ -190,6 +199,8 @@ public class AppRestart
         Timer.Start();
     }
 
+#pragma warning disable S1172 // Unused method parameters should be removed
+#pragma warning disable IDE0060 // Remove unused parameter
     private static void HandleTimer(
         object? sender,
         ElapsedEventArgs e,
@@ -197,6 +208,8 @@ public class AppRestart
         TimeSpan restartTimeSpan,
         (int Left, int Top) originPos,
         CancellationToken ct)
+#pragma warning restore IDE0060 // Remove unused parameter
+#pragma warning restore S1172 // Unused method parameters should be removed
     {
         var timeFormat = timeToWait.TotalDays > 9 ? @"dd\:hh\:mm\:ss" :
                          timeToWait.TotalDays < 1 || (int)timeToWait.TotalHours == 24 ? @"hh\:mm\:ss" : @"d\:hh\:mm\:ss";
