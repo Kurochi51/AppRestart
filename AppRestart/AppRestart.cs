@@ -40,10 +40,14 @@ public class AppRestart
         {
             return;
         }
-        
+
         var cts = new CancellationTokenSource();
         var token = cts.Token;
+#if DEBUG
         var restartTime = DateTime.Now.AddSeconds(restartInterval);
+#else
+        var restartTime = DateTime.Now.AddHours(restartInterval);
+#endif
         var restartTimeSpan = restartTime - DateTime.Now;
         var restartString = restartTime.Hour.ToString("D2") + ":" + restartTime.Minute.ToString("D2") + ":" + restartTime.Second.ToString("D2");
         var monitor = MonitorTask(restartTimeSpan, token);
@@ -144,7 +148,7 @@ public class AppRestart
             var workingDir = Path.GetDirectoryName(appToRestart.MainModule.FileName)
                              ?? Path.GetPathRoot(appToRestart.MainModule.FileName)!;
             Process newApp;
-            if (appToRestart.MainModule.FileVersionInfo.ProductName.Contains("discord",StringComparison.OrdinalIgnoreCase))
+            if (appToRestart.MainModule.FileVersionInfo.ProductName.Contains("discord", StringComparison.OrdinalIgnoreCase))
             {
                 var lastSeparator = workingDir.LastIndexOf(Path.DirectorySeparatorChar);
                 workingDir = lastSeparator != -1 ? workingDir[..lastSeparator] : workingDir;
