@@ -12,17 +12,13 @@ namespace ConsoleAppRestart;
 
 public class AppRestart
 {
-    private static readonly AppRestart MainApp = new();
     private static readonly TimeSpan OneSecond = TimeSpan.FromSeconds(1);
-    private Process? appToRestart;
+    private static readonly AppRestart MainApp = new();
+    private static readonly Timer Timer = new();
+    private CancellationTokenSource? sourceToken;
+    private Process? appToRestart = null;
     private string appName = string.Empty;
     private int restartInterval;
-    private static readonly Timer Timer = new();
-
-    private AppRestart()
-    {
-        appToRestart = null;
-    }
 
     private static void Main()
     {
@@ -41,8 +37,8 @@ public class AppRestart
             return;
         }
 
-        var cts = new CancellationTokenSource();
-        var token = cts.Token;
+        sourceToken = new CancellationTokenSource();
+        var token = sourceToken.Token;
 #if DEBUG
         var restartTime = DateTime.Now.AddSeconds(restartInterval);
 #else
@@ -56,7 +52,7 @@ public class AppRestart
         Console.WriteLine("1. Exit");
         Console.WriteLine();
         _ = Task.Run(() => SetupTimer(restartTimeSpan, token), token);
-        while (true)
+        while (!sourceToken.IsCancellationRequested)
         {
             if (monitor.IsCompleted)
             {
@@ -94,7 +90,7 @@ public class AppRestart
                 // ignored
             }
         }
-        cts.Cancel();
+        sourceToken.Cancel();
     }
 #pragma warning restore MA0011 // IFormatProvider is missing
 
@@ -142,6 +138,7 @@ public class AppRestart
             if (appToRestart?.MainModule?.FileVersionInfo.ProductName is null || FindProcessId(appToRestart.ProcessName.Trim()) is 0)
             {
                 Console.WriteLine("Program {0} isn't running.", appName);
+                sourceToken?.Cancel();
                 return;
             }
 
@@ -177,6 +174,7 @@ public class AppRestart
             }
             appToRestart.Kill();
             await appToRestart.WaitForExitAsync(token).ConfigureAwait(false);
+            Console.WriteLine("{0} was killed, a new instance is starting...", appName);
             newApp.Start();
         }
     }
